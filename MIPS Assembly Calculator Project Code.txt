@@ -1,0 +1,587 @@
+.data
+# Menus
+mainMenu:      .asciiz "\n--- Calculator ---\n1. Integer Mode\n2. Floating Point Mode\n0. Exit\nChoose mode: "
+intMenu:       .asciiz "\nInteger Operations:\n 1.Add 2.Sub 3.Mul 4.Div 5.Mod 6.Pow 7.Square 8.Sqrt 9.Fact\n10.Min 11.Max 12.AND 13.OR 14.XOR 15.NOT 16.Shift Left 17\nChoose operation: "
+floatMenu:     .asciiz "\nFloating Operations:\n 1.Add 2.Sub 3.Mul 4.Div 5.Pow 6.Sqrt 7.Min 8.Max\n0.Back\nChoose operation: "
+
+# Inputs prompts
+inputInt1:     .asciiz "Enter first integer: "
+inputInt2:     .asciiz "Enter second integer: "
+inputFloat1:   .asciiz "Enter first float: "
+inputFloat2:   .asciiz "Enter second float: "
+
+# Messages
+resultMsg:     .asciiz "Result: "
+invalidMsg:    .asciiz "Invalid choice. Try again.\n"
+zeroDivMsg:    .asciiz "Error: Division by zero.\n"
+negSqrtMsg:    .asciiz "Error: Square root of negative number.\n"
+negFactMsg:    .asciiz "Error: Factorial of negative number.\n"
+negPowerMsg:   .asciiz "Error: Negative exponent not supported for power.\n"
+
+newline:       .asciiz "\n"
+comma:         .asciiz ", "
+opLabel:       .asciiz "[Operation: "
+closeBracket:  .asciiz "]\n"
+operandLabel:  .asciiz "Operands: "
+
+# Operation names for printing (null terminated strings)
+intOpNames:    .asciiz "Add\0Sub\0Mul\0Div\0Mod\0Pow\0Square\0Sqrt\0Fact\0Min\0Max\0AND\0OR\0XOR\0NOT\0Shift Left\0Shift Right"
+floatOpNames:  .asciiz "Add\0Sub\0Mul\0Div\0Pow\0Sqrt\0Min\0Max"
+
+.text
+.globl main
+
+main:
+    # Main mode selection loop
+main_mode_loop:
+    li $v0,4
+    la $a0, mainMenu
+    syscall
+
+    li $v0,5
+    syscall
+    move $t0, $v0      # mode choice
+
+    beq $t0, 0, exit_program
+    beq $t0, 1, int_mode
+    beq $t0, 2, float_mode
+
+    # invalid choice retry
+    li $v0,4
+    la $a0, invalidMsg
+    syscall
+    j main_mode_loop
+
+##############################################################
+# Integer mode
+##############################################################
+
+int_mode:
+int_menu_loop:
+    li $v0,4
+    la $a0, intMenu
+    syscall
+
+    li $v0,5
+    syscall
+    move $t1, $v0      # operation choice
+
+    beq $t1, 0, main_mode_loop
+
+    # Read first integer operand
+    li $v0,4
+    la $a0, inputInt1
+    syscall
+    li $v0,5
+    syscall
+    move $t2, $v0
+
+    # For single-operand operations: 7 Square, 8 Sqrt, 9 Fact, 15 NOT
+    li $t9, 7
+    li $t8, 8
+    li $t7, 9
+    li $t6, 15
+    beq $t1, $t9, int_skip_second_op
+    beq $t1, $t8, int_skip_second_op
+    beq $t1, $t7, int_skip_second_op
+    beq $t1, $t6, int_skip_second_op
+
+    # Read second integer operand
+    li $v0,4
+    la $a0, inputInt2
+    syscall
+    li $v0,5
+    syscall
+    move $t3, $v0
+
+int_skip_second_op:
+    move $s0, $t1      # Save operation choice
+
+    # Dispatch integer operations via jal
+    li $t4,1
+    beq $t1, $t4, int_add
+    li $t4,2
+    beq $t1, $t4, int_sub
+    li $t4,3
+    beq $t1, $t4, int_mul
+    li $t4,4
+    beq $t1, $t4, int_div
+    li $t4,5
+    beq $t1, $t4, int_mod
+    li $t4,6
+    beq $t1, $t4, int_pow
+    li $t4,7
+    beq $t1, $t4, int_square
+    li $t4,8
+    beq $t1, $t4, int_sqrt
+    li $t4,9
+    beq $t1, $t4, int_fact
+    li $t4,10
+    beq $t1, $t4, int_min
+    li $t4,11
+    beq $t1, $t4, int_max
+    li $t4,12
+    beq $t1, $t4, int_and
+    li $t4,13
+    beq $t1, $t4, int_or
+    li $t4,14
+    beq $t1, $t4, int_xor
+    li $t4,15
+    beq $t1, $t4, int_not
+    li $t4,16
+
+    # Invalid choice
+    li $v0,4
+    la $a0, invalidMsg
+    syscall
+    j int_menu_loop
+
+# Integer operations subroutines
+
+int_add:
+    addu $t4, $t2, $t3
+    j int_print_result
+
+int_sub:
+    subu $t4, $t2, $t3
+    j int_print_result
+
+int_mul:
+    mul $t4, $t2, $t3
+    j int_print_result
+
+int_div:
+    beq $t3, $zero, int_div_zero_error
+    div $t2, $t3
+    mflo $t4
+    j int_print_result
+
+int_mod:
+    beq $t3, $zero, int_div_zero_error
+    div $t2, $t3
+    mfhi $t4
+    j int_print_result
+
+int_pow:
+    # power with overflow check omitted for brevity, assume small powers
+    li $t4,1
+    move $t5, $zero
+int_pow_loop:
+    beq $t5, $t3, int_pow_done
+    mul $t4, $t4, $t2
+    addi $t5, $t5, 1
+    j int_pow_loop
+int_pow_done:
+    j int_print_result
+
+int_square:
+    mul $t4, $t2, $t2
+    j int_print_result
+
+int_sqrt:
+    bltz $t2, int_neg_sqrt_error
+    li $t4,0
+    li $t5,0
+int_sqrt_loop:
+    mul $t6, $t5, $t5
+    bgt $t6, $t2, int_sqrt_done
+    move $t4, $t5
+    addi $t5, $t5, 1
+    j int_sqrt_loop
+int_sqrt_done:
+    j int_print_result
+
+int_fact:
+    bltz $t2, int_neg_fact_error
+    li $t4,1
+    li $t5,1
+int_fact_loop:
+    bgt $t5, $t2, int_fact_done
+    mul $t4, $t4, $t5
+    addi $t5, $t5, 1
+    j int_fact_loop
+int_fact_done:
+    j int_print_result
+
+int_min:
+    slt $t6, $t2, $t3
+    beq $t6, $zero, int_min_else
+    move $t4, $t2
+    j int_print_result
+int_min_else:
+    move $t4, $t3
+    j int_print_result
+
+int_max:
+    slt $t6, $t3, $t2
+    beq $t6, $zero, int_max_else
+    move $t4, $t2
+    j int_print_result
+int_max_else:
+    move $t4, $t3
+    j int_print_result
+
+int_and:
+    and $t4, $t2, $t3
+    j int_print_result
+
+int_or:
+    or $t4, $t2, $t3
+    j int_print_result
+
+int_xor:
+    xor $t4, $t2, $t3
+    j int_print_result
+
+int_not:
+    nor $t4, $t2, $zero
+    j int_print_result
+
+# Integer error handlers
+
+int_div_zero_error:
+    li $v0,4
+    la $a0, zeroDivMsg
+    syscall
+    j int_menu_loop
+
+int_neg_sqrt_error:
+    li $v0,4
+    la $a0, negSqrtMsg
+    syscall
+    j int_menu_loop
+
+int_neg_fact_error:
+    li $v0,4
+    la $a0, negFactMsg
+    syscall
+    j int_menu_loop
+
+# Integer print result subroutine
+
+int_print_result:
+    # Print operation label
+    li $v0,4
+    la $a0, opLabel
+    syscall
+
+    # Print operation name by traversing null-terminated strings
+    li $t5,1
+    move $t6, $zero
+    la $t7, intOpNames
+int_find_name_loop:
+    beq $s0, $t5, int_print_name_found
+    addi $t5, $t5, 1
+int_skip_str_loop:
+    lb $t8, 0($t7)
+    addi $t7, $t7, 1
+    bnez $t8, int_skip_str_loop
+    j int_find_name_loop
+int_print_name_found:
+    # $t7 points after null, go back to start of name
+    subi $t7, $t7, 1
+    # Back up to start of string
+int_back_loop:
+    lb $t8, -1($t7)
+    bnez $t8, int_back_continue
+    addi $t7, $t7, 1
+    j int_print_name_done
+int_back_continue:
+    subi $t7, $t7, 1
+    j int_back_loop
+int_print_name_done:
+    move $a0, $t7
+    li $v0,4
+    syscall
+
+    li $v0,4
+    la $a0, closeBracket
+    syscall
+
+    # Print operands
+    li $v0,4
+    la $a0, operandLabel
+    syscall
+
+    # Print first operand
+    li $v0,1
+    move $a0, $t2
+    syscall
+
+    # For single operand ops skip printing second operand
+    li $t9,7
+    li $t8,8
+    li $t7,9
+    li $t6,15
+    beq $s0, $t9, int_skip_op2_print
+    beq $s0, $t8, int_skip_op2_print
+    beq $s0, $t7, int_skip_op2_print
+    beq $s0, $t6, int_skip_op2_print
+
+    # Print comma and second operand
+    li $v0,4
+    la $a0, comma
+    syscall
+    li $v0,1
+    move $a0, $t3
+    syscall
+
+int_skip_op2_print:
+
+    # Newline
+    li $v0,4
+    la $a0, newline
+    syscall
+
+    # Print result
+    li $v0,4
+    la $a0, resultMsg
+    syscall
+
+    li $v0,1
+    move $a0, $t4
+    syscall
+
+    # Newline
+    li $v0,4
+    la $a0, newline
+    syscall
+
+    j int_menu_loop
+
+##############################################################
+# Floating point mode
+##############################################################
+
+float_mode:
+float_menu_loop:
+    li $v0,4
+    la $a0, floatMenu
+    syscall
+
+    li $v0,5
+    syscall
+    move $t1, $v0      # operation choice
+
+    beq $t1, 0, main_mode_loop
+
+    # Read first float operand
+    li $v0,4
+    la $a0, inputFloat1
+    syscall
+    li $v0,6
+    syscall
+    mov.s $f12, $f0    # save float input
+
+    # For single operand ops: 6 sqrt only
+    li $t9, 6
+    beq $t1, $t9, float_skip_second_op
+
+    # Read second float operand
+    li $v0,4
+    la $a0, inputFloat2
+    syscall
+    li $v0,6
+    syscall
+    mov.s $f13, $f0    # save float input
+
+float_skip_second_op:
+    move $s0, $t1      # Save operation choice
+
+    # Dispatch float operations
+    li $t4,1
+    beq $t1, $t4, float_add
+    li $t4,2
+    beq $t1, $t4, float_sub
+    li $t4,3
+    beq $t1, $t4, float_mul
+    li $t4,4
+    beq $t1, $t4, float_div
+    li $t4,5
+    beq $t1, $t4, float_pow
+    li $t4,6
+    beq $t1, $t4, float_sqrt
+    li $t4,7
+    beq $t1, $t4, float_min
+    li $t4,8
+    beq $t1, $t4, float_max
+
+    # Invalid choice
+    li $v0,4
+    la $a0, invalidMsg
+    syscall
+    j float_menu_loop
+
+# Float operations subroutines
+
+float_add:
+    add.s $f0, $f12, $f13
+    j float_print_result
+
+float_sub:
+    sub.s $f0, $f12, $f13
+    j float_print_result
+
+float_mul:
+    mul.s $f0, $f12, $f13
+    j float_print_result
+
+float_div:
+    c.eq.s $f13, $f0       # Compare divisor to 0.0
+    bc1t float_div_zero_error
+    div.s $f0, $f12, $f13
+    j float_print_result
+
+float_pow:
+    # Simplified: only integer exponents >=0
+    cvt.w.s $f14, $f13    # convert exponent float to int
+    mfc1 $t5, $f14        # exponent int
+    bltz $t5, float_neg_power_error
+
+    li $t4,1
+    mtc1 $t4, $f2         # float 1.0 in $f2
+
+    # move base to $f4
+    mov.s $f4, $f12
+    li $t6,0
+float_pow_loop:
+    beq $t6, $t5, float_pow_done
+    mul.s $f2, $f2, $f4
+    addi $t6, $t6, 1
+    j float_pow_loop
+float_pow_done:
+    mov.s $f0, $f2
+    j float_print_result
+
+float_sqrt:
+    c.lt.s $f12, $f0    # compare base < 0.0
+    bc1t float_neg_sqrt_error
+    sqrt.s $f0, $f12
+    j float_print_result
+
+float_min:
+    c.lt.s $f12, $f13
+    bc1t float_min_set_f0
+    mov.s $f0, $f13
+    j float_print_result
+float_min_set_f0:
+    mov.s $f0, $f12
+    j float_print_result
+
+float_max:
+    c.lt.s $f13, $f12
+    bc1t float_max_set_f0
+    mov.s $f0, $f13
+    j float_print_result
+float_max_set_f0:
+    mov.s $f0, $f12
+    j float_print_result
+
+# Float error handlers
+
+float_div_zero_error:
+    li $v0,4
+    la $a0, zeroDivMsg
+    syscall
+    j float_menu_loop
+
+float_neg_sqrt_error:
+    li $v0,4
+    la $a0, negSqrtMsg
+    syscall
+    j float_menu_loop
+
+float_neg_power_error:
+    li $v0,4
+    la $a0, negPowerMsg
+    syscall
+    j float_menu_loop
+
+# Float print result subroutine
+
+float_print_result:
+    # Print operation label
+    li $v0,4
+    la $a0, opLabel
+    syscall
+
+    # Print operation name by traversing null-terminated strings
+    li $t5,1
+    la $t7, floatOpNames
+float_find_name_loop:
+    beq $s0, $t5, float_print_name_found
+    addi $t5, $t5, 1
+float_skip_str_loop:
+    lb $t8, 0($t7)
+    addi $t7, $t7, 1
+    bnez $t8, float_skip_str_loop
+    j float_find_name_loop
+float_print_name_found:
+    subi $t7, $t7, 1
+float_back_loop:
+    lb $t8, -1($t7)
+    bnez $t8, float_back_continue
+    addi $t7, $t7, 1
+    j float_print_name_done
+float_back_continue:
+    subi $t7, $t7, 1
+    j float_back_loop
+float_print_name_done:
+    move $a0, $t7
+    li $v0,4
+    syscall
+
+    li $v0,4
+    la $a0, closeBracket
+    syscall
+
+    # Print operands
+    li $v0,4
+    la $a0, operandLabel
+    syscall
+
+    # Print first float operand
+    mov.s $f12, $f12
+    mov.s $f0, $f12
+    li $v0,2
+    syscall
+
+    # For single operand ops (sqrt)
+    li $t9,6
+    beq $s0, $t9, float_skip_op2_print
+
+    # Print comma and second operand
+    li $v0,4
+    la $a0, comma
+    syscall
+
+    mov.s $f12, $f13
+    mov.s $f0, $f12
+    li $v0,2
+    syscall
+
+float_skip_op2_print:
+    # Newline
+    li $v0,4
+    la $a0, newline
+    syscall
+
+    # Print result
+    li $v0,4
+    la $a0, resultMsg
+    syscall
+
+    mov.s $f0, $f0
+    li $v0,2
+    syscall
+
+    # Newline
+    li $v0,4
+    la $a0, newline
+    syscall
+
+    j float_menu_loop
+
+exit_program:
+    li $v0,10
+    syscall
